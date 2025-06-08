@@ -1,21 +1,28 @@
 from flask import Flask, render_template, redirect, url_for, request, flash
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from flask_mail import Mail
+from werkzeug.security import generate_password_hash, check_password_hash
+from email_utils import mail, send_schedule_email
+from forms import RegistrationForm, LoginForm, ScheduleForm
 from models import db, User, Schedule
-from forms import LoginForm, RegisterForm, ScheduleForm
-from email_utils import send_schedule_email
 import datetime
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schedules.db'
-app.config['MAIL_DEFAULT_SENDER'] = 'your-email@gmail.com'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 이메일 설정
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'your-email@gmail.com'
-app.config['MAIL_PASSWORD'] = 'your-password'
+app.config['MAIL_USERNAME'] = 'your_email@gmail.com'
+app.config['MAIL_PASSWORD'] = 'your_email_app_password'
 
+# 초기화
 db.init_app(app)
+mail.init_app(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -25,67 +32,85 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-@app.before_first_request
-def create_tables():
-    db.create_all()
-
+# 홈 페이지
 @app.route('/')
-@login_required
 def index():
-    schedules = Schedule.query.filter_by(user_id=current_user.id).all()
-    return render_template('index.html', schedules=schedules)
+    return render_template('index.html')
 
+# 회원가입
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    form = RegisterForm()
+    form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.username.data, email=form.email.data)
-        user.set_password(form.password.data)
-        db.session.add(user)
+        hashed_pw = generate_password_hash(form.password.data)
+        new_user = User(email=form.email.data, password=hashed_pw)
+        db.session.add(new_user)
         db.session.commit()
-        flash('회원가입 완료! 로그인해주세요.')
-        return redirect(url_for('login'))
+        login_user(new_user)  # 자동 로그인
+        flash('회원가입이 완료되었습니다.')
+        return redirect(url_for('index'))
     return render_template('register.html', form=form)
 
+# 로그인
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and check_password_hash(user.password, form.password.data):
             login_user(user)
+            flash('로그인 성공!')
             return redirect(url_for('index'))
-        flash('로그인 실패. 아이디/비밀번호 확인하세요.')
+        else:
+            flash('이메일 또는 비밀번호가 잘못되었습니다.')
     return render_template('login.html', form=form)
 
+# 로그아웃
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    flash('로그아웃 되었습니다.')
+    return redirect(url_for('index'))
 
-@app.route('/add', methods=['GET', 'POST'])
+# 일정 추가
+@app.route('/add_schedule', methods=['GET', 'POST'])
 @login_required
 def add_schedule():
     form = ScheduleForm()
     if form.validate_on_submit():
         schedule = Schedule(
-            user_id=current_user.id,
             title=form.title.data,
+            description=form.description.data,
             date=form.date.data,
             time=form.time.data,
-            description=form.description.data
+            user_id=current_user.id
         )
         db.session.add(schedule)
         db.session.commit()
-        send_schedule_email(current_user.email, schedule)
+
+        # 이메일 전송
+        send_schedule_email(
+            current_user.email,
+            schedule.title,
+            schedule.date,
+            schedule.time,
+            schedule.description
+        )
+
+        flash('일정이 등록되었습니다.')
         return redirect(url_for('index'))
     return render_template('add_schedule.html', form=form)
 
+# 일정 조회
 @app.route('/calendar')
 @login_required
 def calendar():
-    return render_template('calendar.html')
+    schedules = Schedule.query.filter_by(user_id=current_user.id).all()
+    return render_template('calendar.html', schedules=schedules)
 
+# 실행
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
