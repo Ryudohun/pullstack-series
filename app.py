@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from email_utils import mail, send_schedule_email
 from forms import RegistrationForm, LoginForm, ScheduleForm
 from models import db, User, Schedule
+from flask_wtf import CSRFProtect
 
 mail = Mail()
 
@@ -26,6 +27,7 @@ app.config['MAIL_PASSWORD'] = 'your_app_password'     # 앱 비밀번호 (웹메
 # 📦 확장 기능 초기화
 db.init_app(app)
 mail.init_app(app)
+csrf = CSRFProtect(app)
 
 # 🔐 로그인 관리자 설정
 login_manager = LoginManager()
@@ -35,6 +37,8 @@ login_manager.login_view = 'login'
 # 🔁 사용자 로딩
 @login_manager.user_loader
 def load_user(user_id):
+    if not user_id or not user_id.isdigit():
+        return None
     return User.query.get(int(user_id))
 
 # 🏠 홈
@@ -48,11 +52,7 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_pw = generate_password_hash(form.password.data)
-        new_user = User(
-            username=form.username.data,
-            email=form.email.data,
-            password=hashed_pw
-        )
+        new_user = User(username=form.username.data, email=form.email.data, password=hashed_pw)
         db.session.add(new_user)
         db.session.commit()
         login_user(new_user)
@@ -65,14 +65,22 @@ def register():
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
-        if user and check_password_hash(user.password, form.password.data):
-            login_user(user)
-            flash('로그인 성공!', 'success')
-            next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('index'))
-        else:
-            flash('이메일 또는 비밀번호가 잘못되었습니다.', 'danger')
+        try:
+            user = User.query.filter_by(email=form.email.data).first()
+            print("DB에서 조회된 사용자:", user)
+            if user and check_password_hash(user.password, form.password.data):
+                login_user(user)
+                flash('로그인 성공!', 'success')
+
+                # 👉 로그인 후 이동할 페이지 지정
+                next_page = request.args.get('next')
+                return redirect(next_page) if next_page else redirect(url_for('calendar'))
+
+            else:
+                flash('이메일 또는 비밀번호가 잘못되었습니다.', 'danger')
+        except Exception as e:
+            print("로그인 중 에러 발생:", e)
+            flash('서버 오류가 발생했습니다.', 'danger')
     return render_template('login.html', form=form)
 
 # 🔒 로그아웃
