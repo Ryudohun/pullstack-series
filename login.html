@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}로그인{% endblock %}
+{% block content %}
+<h2>🔐 로그인</h2>
+
+<!-- flash 메시지 출력 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<form method="POST" action="{{ url_for('login') }}">
+    {{ form.hidden_tag() }}
+
+    <div>
+        <label>{{ form.email.label }}</label><br>
+        {{ form.email(size=32) }}
+    </div>
+    <div>
+        <label>{{ form.password.label }}</label><br>
+        {{ form.password(size=32) }}
+    </div>
+
+    <button type="submit">로그인</button>
+</form>
+{% endblock %}
