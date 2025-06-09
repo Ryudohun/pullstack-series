@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}일정 관리{% endblock %} - 학생 일정 관리 시스템</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+</head>
+<body>
+    <header>
+        <h1>📚 학생 일정 관리 시스템</h1>
+        {% if current_user.is_authenticated %}
+            <p>안녕하세요, {{ current_user.username }}님!</p>
+            <nav>
+                <a href="{{ url_for('index') }}">홈</a> |
+                <a href="{{ url_for('add_schedule') }}">일정 추가</a> |
+                <a href="{{ url_for('calendar') }}">캘린더</a> |
+                <a href="{{ url_for('logout') }}">로그아웃</a>
+            </nav>
+        {% else %}
+            <nav>
+                <a href="{{ url_for('login') }}">로그인</a> |
+                <a href="{{ url_for('register') }}">회원가입</a>
+            </nav>
+        {% endif %}
+        <hr>
+    </header>
+
+    <!-- 📣 flash 메시지 출력 -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <hr>
+        <p>&copy; 2025 학생 일정 관리 시스템</p>
+    </footer>
+</body>
+</html>
