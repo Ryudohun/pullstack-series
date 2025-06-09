@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}일정 추가{% endblock %}
+{% block content %}
+<h2>➕ 일정 추가</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <p>{{ form.title.label }}<br>{{ form.title() }}</p>
+    <p>{{ form.date.label }}<br>{{ form.date() }}</p>
+    <p>{{ form.time.label }}<br>{{ form.time() }}</p>
+    <p>{{ form.description.label }}<br>{{ form.description(rows=4) }}</p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% endblock %}
