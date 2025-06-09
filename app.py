@@ -22,7 +22,7 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = 'your_email@gmail.com'  # 본인 이메일
-app.config['MAIL_PASSWORD'] = 'your_app_password'     # 앱 비밀번호 (웹메일 비번 아님!)
+app.config['MAIL_PASSWORD'] = 'your_app_password'  # 앱 비밀번호 (웹메일 비번 아님!)
 
 # 📦 확장 기능 초기화
 db.init_app(app)
@@ -34,6 +34,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+
 # 🔁 사용자 로딩
 @login_manager.user_loader
 def load_user(user_id):
@@ -41,10 +42,12 @@ def load_user(user_id):
         return None
     return User.query.get(int(user_id))
 
+
 # 🏠 홈
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 # 👤 회원가입
 @app.route('/register', methods=['GET', 'POST'])
@@ -60,6 +63,7 @@ def register():
         return redirect(url_for('index'))
     return render_template('register.html', form=form)
 
+
 # 🔓 로그인
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -67,21 +71,25 @@ def login():
     if form.validate_on_submit():
         try:
             user = User.query.filter_by(email=form.email.data).first()
-            print("DB에서 조회된 사용자:", user)
-            if user and check_password_hash(user.password, form.password.data):
-                login_user(user)
-                flash('로그인 성공!', 'success')
+            if user:
+                print("DB에서 조회된 사용자 이메일:", user.email)
+                print("입력된 비밀번호:", form.password.data)
+                print("저장된 비밀번호 해시:", user.password)
 
-                # 👉 로그인 후 이동할 페이지 지정
-                next_page = request.args.get('next')
-                return redirect(next_page) if next_page else redirect(url_for('calendar'))
+                if check_password_hash(user.password, form.password.data):
+                    login_user(user)
+                    flash('로그인 성공!', 'success')
 
-            else:
-                flash('이메일 또는 비밀번호가 잘못되었습니다.', 'danger')
+                    # 로그인 후 이동할 페이지
+                    next_page = request.args.get('next')
+                    return redirect(next_page) if next_page else redirect(url_for('calendar'))
+
+            flash('이메일 또는 비밀번호가 잘못되었습니다.', 'danger')
         except Exception as e:
             print("로그인 중 에러 발생:", e)
             flash('서버 오류가 발생했습니다.', 'danger')
     return render_template('login.html', form=form)
+
 
 # 🔒 로그아웃
 @app.route('/logout')
@@ -90,6 +98,7 @@ def logout():
     logout_user()
     flash('로그아웃 되었습니다.', 'info')
     return redirect(url_for('index'))
+
 
 # 🗓️ 일정 추가
 @app.route('/add_schedule', methods=['GET', 'POST'])
@@ -120,6 +129,7 @@ def add_schedule():
         return redirect(url_for('calendar'))
     return render_template('add_schedule.html', form=form)
 
+
 # 📅 일정 조회
 @app.route('/calendar')
 @login_required
@@ -127,8 +137,22 @@ def calendar():
     schedules = Schedule.query.filter_by(user_id=current_user.id).all()
     return render_template('calendar.html', schedules=schedules)
 
+
+# 🛠️ 사용자 미리 등록하기 (앱 시작 시 실행)
+def create_user():
+    # 임의로 사용자 하나 생성 (이메일과 비밀번호 설정)
+    user = User.query.filter_by(email='testuser@example.com').first()
+    if not user:
+        hashed_pw = generate_password_hash('testpassword123')  # 임의의 비밀번호
+        new_user = User(username='testuser', email='testuser@example.com', password=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
+        print("임의의 사용자 추가 완료")
+
+
 # 🔄 앱 실행
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
+        db.create_all()  # 데이터베이스가 없다면 생성
+        create_user()  # 앱 시작 시 사용자 추가
     app.run(debug=True)
