@@ -32,7 +32,7 @@ csrf = CSRFProtect(app)
 # 🔐 로그인 관리자 설정
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # 로그인 페이지로 리디렉션 설정
 
 
 # 🔁 사용자 로딩
@@ -46,7 +46,10 @@ def load_user(user_id):
 # 🏠 홈
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # 로그인 상태를 확인
+    if current_user.is_authenticated:
+        return render_template('index.html')
+    return redirect(url_for('login'))  # 로그인 안 된 상태면 로그인 페이지로 리디렉션
 
 
 # 👤 회원가입
@@ -72,10 +75,6 @@ def login():
         try:
             user = User.query.filter_by(email=form.email.data).first()
             if user:
-                print("DB에서 조회된 사용자 이메일:", user.email)
-                print("입력된 비밀번호:", form.password.data)
-                print("저장된 비밀번호 해시:", user.password)
-
                 if check_password_hash(user.password, form.password.data):
                     login_user(user)
                     flash('로그인 성공!', 'success')
@@ -86,7 +85,6 @@ def login():
 
             flash('이메일 또는 비밀번호가 잘못되었습니다.', 'danger')
         except Exception as e:
-            print("로그인 중 에러 발생:", e)
             flash('서버 오류가 발생했습니다.', 'danger')
     return render_template('login.html', form=form)
 
@@ -149,10 +147,23 @@ def create_user():
         db.session.commit()
         print("임의의 사용자 추가 완료")
 
+        # testuser에 일정 추가
+        test_user = User.query.filter_by(email='testuser@example.com').first()
+        schedule = Schedule(
+            title="테스트 일정",
+            description="이 일정은 자동으로 생성되었습니다.",
+            date="2025-06-10",  # 예시 날짜
+            time="10:00",  # 예시 시간
+            user_id=test_user.id
+        )
+        db.session.add(schedule)
+        db.session.commit()
+        print("임의의 일정 추가 완료")
+
 
 # 🔄 앱 실행
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # 데이터베이스가 없다면 생성
-        create_user()  # 앱 시작 시 사용자 추가
+        create_user()  # 앱 시작 시 사용자 및 일정 추가
     app.run(debug=True)
