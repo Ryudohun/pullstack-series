@@ -1,0 +1,15 @@
+{% if current_user.is_authenticated %}
+  <h2>📅 {{ current_user.username }}님의 일정 목록</h2>
+  <ul>
+      {% for schedule in schedules %}
+          <li>
+              <strong>{{ schedule.title }}</strong> - {{ schedule.date }} {{ schedule.time }}<br>
+              {{ schedule.description }}
+          </li>
+      {% else %}
+          <p>등록된 일정이 없습니다.</p>
+      {% endfor %}
+  </ul>
+{% else %}
+  <p>로그인이 필요합니다. <a href="{{ url_for('login') }}">로그인하기</a></p>
+{% endif %}
